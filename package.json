@@ -1,0 +1,16 @@
+{
+  "name": "herdr-taskforce",
+  "version": "0.1.0",
+  "description": "Async multi-agent team orchestration for pi + Herdr. An sqlite message box (~/.herdr-taskforce/box.db) with pi tools (htf_send / htf_poll / htf_history) and background delivery (sendUserMessage) to interface/leader sessions, plus a skill defining the interface and the leader/supporter/builders/evaluators team roles.",
+  "private": true,
+  "keywords": ["pi-package", "herdr", "multi-agent", "orchestration", "taskforce"],
+  "license": "MIT",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"]
+  }
+}
