@@ -180,11 +180,12 @@ function run(sql) {
 }
 
 function query(sql) {
-  const out = execFileSync(
-    SQLITE3,
-    ["-json", DB_PATH, `PRAGMA busy_timeout = 3000;\n${sql}`],
-    { encoding: "utf8" }
-  ).trim();
+  // NOTE: never prepend a PRAGMA here. In -json mode a PRAGMA emits its own
+  // result array (e.g. [{"timeout":3000}]) that corrupts JSON.parse; and when
+  // the SELECT matches nothing, that array alone is parsed as a fake message.
+  const out = execFileSync(SQLITE3, ["-json", DB_PATH, sql], {
+    encoding: "utf8",
+  }).trim();
   return out ? JSON.parse(out) : [];
 }
 
@@ -206,8 +207,10 @@ function peekUndelivered(recipient, room, limit) {
 }
 
 function markDelivered(id) {
+  const n = Number(id);
+  if (!Number.isInteger(n)) return; // never UPDATE ... WHERE id = NaN
   ensureInit();
-  run(`UPDATE messages SET delivered_at = CURRENT_TIMESTAMP WHERE id = ${Number(id)};`);
+  run(`UPDATE messages SET delivered_at = CURRENT_TIMESTAMP WHERE id = ${n};`);
 }
 
 function history(room, limit) {
@@ -230,6 +233,7 @@ function startDelivery(pi, ctx) {
       const rows = peekUndelivered(ME, undefined, 5);
       for (const row of rows) {
         try {
+          if (!Number.isInteger(row.id)) continue; // only deliver real messages
           ctx.ui?.notify?.(`box: ${row.sender} (${row.room})`, "info");
           if (ctx.isIdle()) {
             pi.sendUserMessage(fmt(row));
