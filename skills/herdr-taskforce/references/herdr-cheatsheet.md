@@ -37,14 +37,19 @@ herdr pane split --pane <pane> --direction down --cwd "$PWD" --no-focus \
 herdr pane rename <pane> builder-1
 ```
 
-## エージェント起動（モデル指定）
+## エージェント起動
+
+モデルは `~/.herdr-taskforce/conf.json`（`roles.<role>`）から解決します。
+**ツール利用（推奨）**:
+`htf_agent_start(name=<名前>, role=<builder|evaluator|...>, pane=<pane>)`
+
+CLI 直打ちの場合は conf.json の model / thinking を指定:
 
 ```bash
-herdr agent start <名前> --kind pi --pane <pane> -- --model opencode-go/deepseek-v4-flash --thinking max --approve
+herdr agent start <名前> --kind pi --pane <pane> -- --model <conf.json の model> --thinking <conf.json の thinking> --approve
 ```
 
 - 名前は `[a-z][a-z0-9_-]{0,31}`、生存中は一意。
-- モデル: リーダー/サポーター/ビルダーズ/エバリュエータズ は SKILL.md の表を参照。
 
 ## JSON パース（jq なし）
 

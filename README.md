@@ -11,8 +11,9 @@ sqlite の**依頼箱**を介して非同期に行います。
 - **ノンブロッキング**: interface は待機せず、いつでもユーザーと会話できます。
 - **依頼箱**: `~/.herdr-taskforce/box.db`（SQLite / WAL / bash + `sqlite3`、
   デーモンなし）。
-- **pi 拡張**: ツール `htf_send` / `htf_poll` / `htf_history` と、box の新着を
-  `sendUserMessage` で interface / leader セッションへ自動配信。
+- **pi 拡張**: box ツール（`htf_send` / `htf_poll` / `htf_history`）、Herdr 操作
+  ツール（ワークスペース/タブ/ペイン/エージェント起動・プロンプト）、
+  および box の新着を `sendUserMessage` で interface / leader セッションへ自動配信。
 - **複数チーム並行**: `room` 単位でチームを分離し、並行運用できます。
 
 ## 役割とモデル
@@ -24,6 +25,40 @@ sqlite の**依頼箱**を介して非同期に行います。
 | supporter | `opencode-go/kimi-k3` | `max` | 調査・ナレッジ供給・作戦立案補佐（leader とのみ通信） |
 | builders | `opencode-go/deepseek-v4-flash` | `max` | リーダーの指示どおり実装 |
 | evaluators | `opencode-go/gpt-5.6-luna` | `max` | 検証・テスト・QA・日本語の推敲 |
+
+上表は**初期デフォルト**です。モデルは `~/.herdr-taskforce/conf.json` の
+`roles.<役割>` で変更できます（初回起動時に自動生成）。チーム起動時はモデルを
+意識せず、`htf_agent_start(role=<役割>)` を呼ぶだけです。
+
+## 設定（conf.json）
+
+`~/.herdr-taskforce/conf.json`（`HERDR_TASKFORCE_CONF` で変更可）:
+
+```json
+{
+  "roles": {
+    "leader":    { "model": "opencode-go/deepseek-v4-pro",   "thinking": "max" },
+    "supporter": { "model": "opencode-go/kimi-k3",           "thinking": "max" },
+    "builder":   { "model": "opencode-go/deepseek-v4-flash", "thinking": "max" },
+    "evaluator": { "model": "opencode-go/gpt-5.6-luna",      "thinking": "max" }
+  }
+}
+```
+
+欠けている役割・キーはデフォルトにフォールバックします。
+
+## Herdr 操作ツール
+
+Herdr の操作はすべて pi ツールで行えます（CLI 構文・モデル指定・JSON パースを
+意識しない）:
+
+| ツール | 説明 |
+|---|---|
+| `htf_workspace_create` / `htf_workspace_close` | ワークスペース作成 / クローズ |
+| `htf_tab_create` / `htf_tab_close` | タブ作成 / クローズ |
+| `htf_pane_split` / `htf_pane_rename` / `htf_pane_close` | ペイン分割 / リネーム / クローズ |
+| `htf_agent_start` | role から conf.json のモデルを適用してエージェント起動 |
+| `htf_agent_prompt` | プロンプト送信（`wait` 既定 `false`、ブロックしない） |
 
 ## インストール
 
@@ -45,7 +80,8 @@ pi install /path/to/pi-herdr-taskforce
    ```
 
 2. 会話で依頼（例:「タスクフォースで実装して」、または `/skill:herdr-taskforce`）。
-   interface が新しい Herdr ワークスペースに team を起動し、指示します。
+   interface が `htf_*` ツールで新しい Herdr ワークスペースに team を起動し、
+   指示します（モデルは conf.json から自動適用）。
 
 3. 以降は非同期: leader からの質問は box 経由で配信され、インターフェースが
    ユーザーに中継します。完了報告も box 経由で届きます。

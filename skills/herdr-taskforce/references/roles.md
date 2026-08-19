@@ -1,7 +1,10 @@
 # チームロール（herdr-taskforce）
 
 このファイルはタスクフォースの各ロールを定義します。自分のロールの節だけを
-読み、それに従ってください。Herdr の操作は `herdr-cheatsheet.md` と
+読み、それに従ってください。このファイルは拡張が
+`~/.herdr-taskforce/docs/roles.md` にもコピーします。
+各役割のモデルは `~/.herdr-taskforce/conf.json` の `roles.<role>` で設定され、
+`htf_agent_start` が解決します。Herdr の操作は `herdr-cheatsheet.md` と
 `~/.pi/agent/skills/herdr/SKILL.md` を参照してください。
 
 ## 共通規約
@@ -12,11 +15,12 @@
   - **ユーザーとのやり取りは必ず box 経由**（herdr は使わない）。
   - 自分宛の返信は配信拡張が自動で注入されます（待ちポーリング不要）。
 - **Herdr**: チーム内通信（リーダー⇔サポーター/ビルダーズ/エバリュエータズ）
-  は herdr 経由（`herdr agent prompt` / `herdr agent read`）。
+  は herdr 経由（`htf_agent_prompt` または `herdr agent prompt` /
+  `herdr agent read`）。
 - 長い成果物はファイルに書き、チャットや box には短いステータス + パスを
   書く。
 
-## リーダー（`opencode-go/deepseek-v4-pro`, thinking `max`）
+## リーダー（モデル: conf.json の roles.leader）
 
 **責務**: 意思決定と統制。ユーザーが下した意思決定を実現するために計画を
 立案し、時としてユーザーに方針を仰ぎ、ユーザーの意思を達成すること。
@@ -36,27 +40,28 @@
    `htf_send`（recipient=`interface`）。回答は配信拡張が注入するので、
    それまでにできる作業（次のタスク分解など）を進めておく。
 4. タスクの数・難易度・並列可能数に応じて、**ビルダーズを別タブに起動**
-   する（`builders` タブ。複数可）。各ビルダーズに
-   `herdr agent prompt <builder名> "<タスク>" --wait` で作業を命令する。
+   する（`builders` タブ。複数可）。起動は `htf_agent_start`
+   （role="builder"）を使い、モデルは conf.json に任せる。各ビルダーズへは
+   `htf_agent_prompt(agent=<builder名>, wait=true)` で作業を命令する。
 5. ビルダーズの完了報告（herdr 経由）を受け、実装が揃ったら
    **エバリュエータズを別タブに起動**（`evaluators` タブ。複数可）し、
-   検証・テスト・QA チェック・日本語の推敲を命令する。
+   検証・テスト・QA チェック・日本語の推敲を命令する（起動は
+   `htf_agent_start`（role="evaluator"）、命令は `htf_agent_prompt(wait=true)`）。
 6. エバリュエータズの結果に応じて再決定し、必要な修正をビルダーズへ
    命令する。このループが運用の根幹。指摘がなくなるまで繰り返す。
 7. 全てのタスクが完了したら、box で完了報告:
    `htf_send`（recipient=`interface`, body=完了サマリ + 成果物パス）。
 
-**ビルダーズ/エバリュエータズの起動例**:
+**ビルダーズ/エバリュエータズの起動（ツール）**:
 
-```bash
-TAB=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "builders" --no-focus \
-  | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["tab"]["tab_id"])')
-# 1つ目はタブのルートペイン。複数起動する場合は分割してから agent start。
-herdr agent start builder-1 --kind pi --pane <pane> -- --model opencode-go/deepseek-v4-flash --thinking max --approve
-herdr agent start evaluator-1 --kind pi --pane <pane> -- --model opencode-go/gpt-5.6-luna --thinking max --approve
-```
+1. `htf_tab_create(workspace=<WS>, label="builders")` → `root_pane`
+2. 複数必要な場合は `htf_pane_split(pane=<root_pane>, direction="down")` で追加
+3. `htf_pane_rename(...)` で名前を付け、`htf_agent_start(name="builder-1", role="builder", pane=<pane>)`
+4. 命令: `htf_agent_prompt(agent="builder-1", text="<タスク>", wait=true)`
 
-## サポーター（`opencode-go/kimi-k3`, thinking `max`）
+（エバリュエータズも同様に role="evaluator"。モデルは conf.json から自動解決）
+
+## サポーター（モデル: conf.json の roles.supporter）
 
 **責務**: コードベースの調査、Issue の調査、公式ドキュメントなどのウェブ
 サイトなど、様々な情報源にアクセスして、リーダーが意思決定を行うために
@@ -71,7 +76,7 @@ herdr agent start evaluator-1 --kind pi --pane <pane> -- --model opencode-go/gpt
 2. 回答は `herdr agent read` で読めるよう、チャットに短くまとめる。
    長い調査結果はファイルに書く。
 
-## ビルダーズ（`opencode-go/deepseek-v4-flash`, thinking `max`）
+## ビルダーズ（モデル: conf.json の roles.builder）
 
 **責務**: リーダーから指揮された通りにコードを実装すること。作戦立案が
 完了した後の実装フェーズの実働はビルダーズの責務。
@@ -82,7 +87,7 @@ herdr agent start evaluator-1 --kind pi --pane <pane> -- --model opencode-go/gpt
 2. スコープは変更しない。不明点があればリーダーに報告し、勝手に広げない。
 3. 完了したら herdr でリーダーに報告（タスク id + 変更概要 + 検証方法）。
 
-## エバリュエータズ（`opencode-go/gpt-5.6-luna`, thinking `max`）
+## エバリュエータズ（モデル: conf.json の roles.evaluator）
 
 **責務**: ビルダーズの同僚。実装が終わるとリーダーから検証・テスト・
 QA チェック・日本語の推敲といったタスクを命令され、実施して報告する。
